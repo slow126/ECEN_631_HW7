@@ -20,11 +20,6 @@ for j in range(len(files) - m):
     gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
     center = [gray.shape[0] / 2, gray.shape[1] / 2]
     gray = gray[0:240, 250:400]
-    # gray[240:, :] = 255
-    # gray[:, 0:250] = 255
-    # gray[:, 400:] = 255
-    # cv2.imshow("gray", gray)
-    # cv2.waitKey()
 
     corners = cv2.goodFeaturesToTrack(gray, 1000, .1, 1)
 
@@ -33,12 +28,9 @@ for j in range(len(files) - m):
     next_frame = cv2.resize(next_frame, (int(next_frame.shape[1] / SCALE), int(next_frame.shape[0] / SCALE)))
     next_gray = cv2.cvtColor(next_frame, cv2.COLOR_RGB2GRAY)
     next_gray = next_gray[0:240, 250:400]
-    # next_corners, status, err = cv2.calcOpticalFlowPyrLK(gray, next_gray, corners, None, **lk_params)
     next_corners, status, err = cv2.calcOpticalFlowPyrLK(gray, next_gray, corners, None, maxLevel=LEVEL)
 
     goodPts = cv2.threshold(err, PT_THRESHOLD, 1, cv2.THRESH_BINARY_INV)
-
-    # retval, mask = cv2.findFundamentalMat(np.array(corners), np.array(next_corners), cv2.FM_RANSAC, 3, 0.2)
 
     corners = np.squeeze(corners)
     next_corners = np.squeeze(next_corners)
@@ -47,9 +39,9 @@ for j in range(len(files) - m):
     if mask is not None:
         corners = corners * mask
         next_corners = next_corners * mask
-    # if mask is not None:
-    #     corners = corners * mask
-    #     next_corners = next_corners * mask
+
+    corners = corners + (240, 0)
+    next_corners = next_corners + (240, 0)
 
     a = []
     new_a = []
@@ -57,26 +49,25 @@ for j in range(len(files) - m):
     for i in range(len(corners)):
         if (goodPts[1][i] != 0):
             if (tuple(next_corners[i]) != (0, 0) and tuple(corners[i]) != (0, 0)):
-                cv2.circle(frame, tuple((np.squeeze(corners[i] + (240, 0))).astype(int)), 1, (0, 255, 0), -1)
-                cv2.line(frame, tuple((np.squeeze(corners[i] + (240, 0))).astype(int)), tuple((np.squeeze(next_corners[i] + (240, 0))).astype(int)), (255, 0, 255),
+                cv2.circle(frame, tuple((np.squeeze(corners[i])).astype(int)), 1, (0, 255, 0), -1)
+                cv2.line(frame, tuple((np.squeeze(corners[i])).astype(int)), tuple((np.squeeze(next_corners[i])).astype(int)), (255, 0, 255),
                          thickness=1)
                 a.append(math.sqrt((corners[i][0] - next_corners[i][0])**2 + (corners[i][1] - next_corners[i][1])**2))
-                dist2 = math.sqrt((next_corners[i][0] - center[0])**2 + (next_corners[i][1] - center[1])**2)
-                dist1 = math.sqrt((corners[i][0] - center[0])**2 + (corners[i][1] - center[1])**2)
-                new_a.append(np.abs(dist2 - dist1))
+                dist2 = math.sqrt((next_corners[i][0] - center[1])**2 + (next_corners[i][1] - center[0])**2)
+                dist1 = math.sqrt((corners[i][0] - center[1])**2 + (corners[i][1] - center[0])**2)
+                new_a.append(dist2/dist1)
 
 
     expansion.append(np.mean(a))
-    new_expan.append(np.median(new_a))
+    new_expan.append(np.mean(new_a))
     cv2.imshow("frame", frame)
     # cv2.imwrite('LK/' + SAVE_PATH + '/frame-' + str(j).zfill(5) + '.jpg', frame)
     cv2.waitKey(1)
 
-# expansion = new_expan
+expansion = new_expan
 frame_num = np.arange(1, 18)
 expansion = np.array(expansion)
 tau = (expansion) / (expansion - 1)
-tau = 30 * tau
 plt.scatter(frame_num, tau)
 
 out = np.polyfit(frame_num, tau, 1)
